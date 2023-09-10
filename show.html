@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+	<meta charset="utf-8">
+	<title>SHOW</title>
+	<script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+	<style type="text/css">
+		html, body {
+			width: 100%;
+			height: 100%;
+			margin: 0px;
+			overflow: hidden;
+			-webkit-user-select: none;
+		}
+	</style>
+	<canvas style="position: fixed; width: 100%; height: 100%; pointer-events: none; z-index: 2;">
+	<script type="text/javascript">
+		let canvas = document.querySelector('canvas')
+		let c = canvas.getContext('2d')
+		canvas.width = innerWidth * devicePixelRatio
+		canvas.height = innerHeight * devicePixelRatio
+		c.scale(devicePixelRatio, devicePixelRatio)
+
+		addEventListener('resize', () => {
+			c.fillStyle = `rgb(0, 0, 0)`
+			c.fillRect(0, 0, innerWidth, innerHeight)
+			canvas.width = innerWidth * devicePixelRatio
+			canvas.height = innerHeight * devicePixelRatio
+			c.scale(devicePixelRatio, devicePixelRatio)
+		})
+
+		class Particle {
+			constructor(data) {
+				this.x = Math.random() * innerWidth * 0.8 + innerWidth * 0.1
+				this.y = innerHeight
+				this.vx = data.vx * 0.05
+				this.vy = data.vy * 0.05
+				this.px = this.x
+				this.py = 0
+				this.w = Math.random() * 6 + 3
+				this.time = 120
+				this.c1 = data.color[0]
+				this.c2 = data.color[1]
+			}
+
+			update(deltaTime) {
+				this.time--
+				this.px = this.x
+				this.py = this.y
+				this.vx *= Math.pow(0.95, (deltaTime) * 0.05)
+				this.vy *= Math.pow(0.95, (deltaTime) * 0.05)
+				this.x += this.vx * deltaTime * 0.05
+				this.y += this.vy * deltaTime * 0.05
+
+				this.vy += deltaTime * 0.01
+
+				c.globalCompositeOperation = 'source-over'
+				c.strokeStyle = `rgb(${this.c1.r}, ${this.c1.g}, ${this.c1.b})`
+				c.lineWidth = this.w
+				c.beginPath()
+				c.moveTo(this.px, this.py)
+				c.lineTo(this.x, this.y)
+				c.stroke()
+				particles.push(new Particle2({ x: this.x, y: this.y, color: [this.c1, this.c2][Math.floor(Math.random() * 2)] }))
+				if(this.time == 60) for(let i = 0; i < 20; i++) particles.push(new Particle2({ x: this.x, y: this.y, color: [this.c1, this.c2][Math.floor(Math.random() * 2)] }))
+			}
+		}
+
+		class Particle2 {
+			constructor(data) {
+				this.x = data.x
+				this.y = data.y
+				let random = Math.random() * 6.28318
+				this.vx = Math.sin(random) * 10
+				this.vy = Math.cos(random) * 10
+				this.s = Math.random() * 5
+				this.time = 60 + Math.random() * 60
+				this.c = data.color
+			}
+
+			update(deltaTime) {
+				this.time -= deltaTime * 0.1
+				this.vx *= Math.pow(0.95, (deltaTime) * 0.05)
+				this.vy *= Math.pow(0.95, (deltaTime) * 0.05)
+				this.x += this.vx * deltaTime * 0.05
+				this.y += this.vy * deltaTime * 0.05
+
+				this.vy += deltaTime * 0.01
+
+				c.globalCompositeOperation = 'screen'
+				c.fillStyle = `rgb(${this.c.r}, ${this.c.g}, ${this.c.b})`
+				c.beginPath()
+				c.arc(this.x, this.y, this.s, 0, 6.28318)
+				c.fill()
+
+				if(Math.random() * 1 < 0.2) {
+					c.beginPath()
+					c.arc(this.x + Math.random() * 20 - 10, this.y + Math.random() * 20 - 10, Math.random() * 10, 0, 6.28318)
+					c.fill()
+				}
+			}
+		}
+
+		let particles = []
+		let lastTime = 0
+
+		c.fillStyle = `rgb(0, 0, 0)`
+		c.fillRect(0, 0, innerWidth, innerHeight)
+
+		function draw(time) {
+			c.globalCompositeOperation = 'source-over'
+			c.fillStyle = `rgba(0, 0, 0, 0.05)`
+			c.fillRect(0, 0, innerWidth, innerHeight)
+			requestAnimationFrame(draw)
+			for(let p of particles) p.update(Math.min(1000, time - lastTime))
+			particles = particles.filter(p => p.time > 0)
+
+			lastTime = time
+		}
+		requestAnimationFrame(draw)
+	</script>
+	<script type="text/javascript">
+		let socket = io()
+		socket.on('draw', data => setTimeout(() => particles.push(new Particle(data)), 300))
+	</script>
+</html>

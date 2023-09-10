@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>SHOW</title>
+	<meta name="theme-color" content="black">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<script src="/socket.io/socket.io.js" type="text/javascript"></script>
+</head>
+<body>
+	<style type="text/css">
+		html, body {
+			width: 100%;
+			height: 100%;
+			margin: 0px;
+			overflow: hidden;
+			-webkit-user-select: none;
+			user-select: none;
+			background: black;
+			touch-action: none;
+		}
+	</style>
+	<canvas style="position: fixed; width: 100%; height: 100%; pointer-events: none; z-index: 2;">
+	<script type="text/javascript">
+		let canvas = document.querySelector('canvas')
+		let c = canvas.getContext('2d')
+		canvas.width = innerWidth * devicePixelRatio
+		canvas.height = innerHeight * devicePixelRatio
+		c.scale(devicePixelRatio, devicePixelRatio)
+
+		addEventListener('resize', () => {
+			canvas.width = innerWidth * devicePixelRatio
+			canvas.height = innerHeight * devicePixelRatio
+			c.scale(devicePixelRatio, devicePixelRatio)
+		})
+
+		let color1 = {}
+		let color2 = {}
+		let ready = 1
+		let transition = 1
+		let start = false
+		let rotate = 0
+		let particles = []
+		let lastTime = 0
+
+		class Particle {
+			constructor(vx, vy, color) {
+				this.vx = vx
+				this.vy = vy
+				this.time = 0.1
+				this.c = color
+			}
+
+			update(deltaTime) {
+				this.time += deltaTime * 0.003
+				c.strokeStyle = `rgb(${this.c.r}, ${this.c.g}, ${this.c.b})`
+				c.lineCap = 'round'
+				c.lineWidth = 18
+				c.beginPath()
+				c.moveTo(innerWidth / 2 + this.vx * (this.time - 0.1), innerHeight / 2 + this.vy * (this.time - 0.1))
+				c.lineTo(innerWidth / 2 + this.vx * this.time, innerHeight / 2 + this.vy * this.time)
+				c.stroke()
+			}
+		}
+
+		function setColor() {
+			color1.r = Math.random() * 255
+			color1.g = Math.random() * 128 + 128
+			color1.b = Math.random() * 128 + 128
+			color2.r = Math.random() * 255
+			color2.g = Math.random() * 128 + 128
+			color2.b = Math.random() * 128 + 128
+		}
+		setColor()
+
+		function draw(time) {
+			requestAnimationFrame(draw)
+			c.clearRect(0, 0, innerWidth, innerHeight)
+			transition = transition + (ready - transition) * (1 - Math.pow(0.8, (time - lastTime) * 0.05))
+			rotate += 0.00523
+			for(let i = 0; i < 16; i++) {
+				let color = [color1, color2][i % 2]
+				c.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`
+				c.save()
+				c.translate(innerWidth / 2, innerHeight / 2)
+				c.rotate(0.392 * i + rotate)
+				c.beginPath()
+				c.arc((innerWidth + innerHeight) / 8 * transition, 0, 8, 0, 6.28318)
+				c.fill()
+				c.restore()
+			}
+			for(let p of particles) p.update(time - lastTime)
+			particles = particles.filter(p => p.time < 60)
+			lastTime = time
+		}
+		requestAnimationFrame(draw)
+
+		let socket = io()
+		let x = 0, y = 0
+
+		for(let event of ['touchstart', 'mousedown']) addEventListener(event, e => {
+			start = true
+			x = (e.type.startsWith('touch'))? e.touches[0].clientX : e.clientX
+			y = (e.type.startsWith('touch'))? e.touches[0].clientY : e.clientY
+		})
+
+		for(let event of ['touchmove', 'mousemove']) addEventListener(event, e => {
+			if(!start) return
+			let moved = y - ((e.type.startsWith('touch'))? e.changedTouches[0].clientY : e.clientY)
+			ready = 1 - Math.max(Math.min(moved / 100, 1), 0)
+		})
+
+		for(let event of ['touchend', 'mouseup']) addEventListener(event, e => {
+			ready = 1
+			start = false
+			if(((e.type.startsWith('touch'))? e.changedTouches[0].clientY : e.clientY) > y - 100) return
+			let vx = ((e.type.startsWith('touch'))? e.changedTouches[0].clientX : e.clientX) - x
+			let vy = ((e.type.startsWith('touch'))? e.changedTouches[0].clientY : e.clientY) - y
+			particles.push(new Particle(vx, vy * 0.8 - 500, color1))
+			socket.emit('input', { vx: vx, vy: vy * 0.8 - 500, color: [color1, color2] })
+			setColor()
+		})
+	</script>
+</html>
